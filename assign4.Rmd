@@ -8,17 +8,73 @@ For the regular expression exercises, try writing first using regular expression
 
 # Part 1
 
+## library packages
+```{r library package}
+library(tidyverse)
+library(lubridate)
+```
+
 ## R4DS 16.4.5
 
 Create a vector of dates giving the first day of every month in the current year. 
+```{r the first day of every month}
+
+current_year <- as.numeric(year(today()))
+
+a <- years(current_year)+months(1:11)+days(1)
+
+make_datetime(a@year,a@month,a@day)
+```
 
 Write a function that given your birthday (as a date), returns how old you are in years.
 
+```{r calculation age}
+calculation_old <- function(x){
+  age = 2019 - year(ymd(x))
+  print(age)
+}
+
+calculation_old("1996-12-12")
+```
+
 Write a function that given your birthday, returns the day of the week you were born on. 
+```{r return weekday}
+return_weekday <- function(x){
+  wday(ymd(x), label = T)
+}
+
+return_weekday("1996-12-12")
+
+```
+
+
+
 
 ## R4DS 14.3.2.1
 
 Given the corpus of common words in stringr::words, create regular expressions that find all words that have seven letters or more. (Since this list is long, you might want to use the match argument to str_view() to show only the matching or non-matching words.)
+
+```{r library VerbalExpressions}
+library(RVerbalExpressions)
+```
+
+
+```{r find all words that have seven letters or more}
+words <- stringr::words
+
+str_view(words, "^\\w{7,}$", match = TRUE)
+
+seven_more <- rx() %>% 
+  rx_start_of_line() %>% 
+  rx_word_char() %>%
+  rx_repeat_previous(7) %>%
+  rx_anything() %>% 
+  rx_end_of_line() %>% 
+  print()
+
+str_view(words,seven_more, match = T)
+```
+
 
 ## R4DS 14.3.3.1
 
@@ -26,26 +82,236 @@ Use str_detect to find all words that:
 
 That only contain consonants. (Hint: thinking about matching “not”-vowels.)
 
+```{r Only contain consonants}
+str_detect(words,"^([^aeiou]+)$")
+
+find1 <- rx() %>% 
+  rx_start_of_line() %>% 
+  rx_something_but("aeiou") %>% 
+  rx_end_of_line()
+
+find1
+
+str_detect(words, find1)
+```
+
 Empirically verify the rule “i before e except after c”.
+
+```{r Empirically verify the rule “i before e except after c”}
+
+str_detect(words, "[^c]ie")
+
+rule <- rx() %>% 
+  rx_anything_but("c") %>% 
+  rx_find("i") %>% 
+  rx_find("e") %>% 
+  print()
+
+str_detect(words, rule)
+```
+
 
 Create a regular expression that will match telephone numbers as commonly written in the US. Split this up into multiple expressions as needed.
 
-# Part 2
+```{r regular expression to match telephone numbers}
+telrx <- rx() %>%
+  rx_start_of_line() %>%
+  rx_maybe("(") %>% 
+  rx_digit() %>% 
+  rx_repeat_previous(3) %>% 
+  rx_maybe(")") %>% 
+  rx_any_of("-. ") %>% 
+  rx_digit() %>% 
+  rx_repeat_previous(3) %>% 
+  rx_any_of("-. ") %>%
+  rx_digit() %>% 
+  rx_repeat_previous(4) %>% 
+  rx_end_of_line() %>% 
+  print() %>% 
+  grepl(c("217-377-2867", "217.377.2867", "EM7.377.2867","(912) 356 4327")) %>% 
+  print()
+```
 
+
+# Part 2
 
 Choose a dataset (this can be the same dataset as the last assignment, or a new one). Define a predictive modeling problem. Create the appropriate files and notebooks to do the following:
 
 1. Describe the data and the problem
 
+The dataset contains meteorological data from the HI-SEAS Habitat in Hawaii. It contains columns including "UNIXTime", "Time", "wind direction", "wind speed", "humidity", temperature, pressure, time of sunrise and time of sunset and more. It contains those data from September 2016 to December 2016.
+
+**My main problem** and **the response parameter** that is to be explored is: "Solar_radiation". I would like to explore the relationship between solar radiation and other predictors/variables listed in this data set. And use useful predictors to better predict solar radiation.
+
 2. Read in and check data
 
-2. Clean up the data. 
+## library package
+```{r library package}
+library(readr)
+library(lubridate)
+library(assertr)
+library(janitor)
+```
+
+
+## Import data and check data
+
+```{r import data, clean column names and view data}
+solarprediction <- read_csv("SolarPrediction.csv") %>% clean_names() # clean column names
+str(solarprediction)
+head(solarprediction)
+dim(solarprediction)
+summary(solarprediction)
+```
+The data set has 32686 rows and 11 columns.
+
+
+```{r check the data using assert}
+solarprediction %>% 
+  assert(!is.na(.)) %>% # check whether there is NA value
+  assert(within_bounds(0,2000), radiation) %>% # check whether the solar radition intensity is in a reasonable range
+  assert(within_bounds(14,103), temperature) %>% # check whether the temperature is in a reasonable range
+  assert(within_bounds(28,32), pressure) %>% # check whether the pressure is in a reasonable range
+  assert(within_bounds(0,100), humidity) %>% # check whether the Humidity is in a reasonable range
+  assert(within_bounds(0,300), wind_direction_degrees) %>% # check whether wind direction degrees is in a reasonable range
+  assert(within_bounds(0,15), speed) # check whether the speed is in a reasonable range
+```
+There are no NA values in this data set and the values of the most variables are in reasonable ranges. However, I think **humidity** which is supposed to be **relative humidity** could not have a value larger than 100. Therefore, I will modify those outliers in the second part.
+
+3. Clean up the data.
+
+## Combine the first three columns, which all refer to the data and time. Then arrange the data set by time
+
+```{r arrange data based on Time}
+solarprediction$date_time <- as.POSIXct(as.numeric(as.character(solarprediction$unix_time)),origin="1970-01-01",tz="HST")
+
+solarprediction <- solarprediction[, -c(1,2)]
+solarprediction <- solarprediction %>% 
+  arrange(date_time) %>% 
+  select(date_time, everything())
+```
+
+
+
+## Modify outliers in humidity
+```{r modify outliers in humidity}
+max(solarprediction$humidity) # I will modify those values which >100 and <= 103 to 100
+
+solarprediction <- solarprediction %>% 
+  mutate(humidity = if_else(humidity > 100, 100, humidity))
+```
+Since the max value of outlier is only 103 which is really close to 100, I will modify outlier values into 100.
+
+## basicly check the cleaned data
+```{r check cleaned data set}
+head(solarprediction)
+```
 
 *Note: You may request that score for these sections replace your score for the coding portion of Assignment 3.*
 
 4. Using best practices, write four functions which add engineered features to the dataset, including a description and rationale. Include a test to determine whether the features are working as intended. 
 
+## Feature Engineering: month, hour of a day
+
+I guess different months could be related to solar radiation. So I need to generate a new feature named month. Similarly, different hours of a day may also be related to radition
+```{r new feature: month, hour of a day}
+generate_month <- function(df, date){
+df <- df %>% 
+  mutate(month = factor(month({{date}}),labels = c("SEPT","OCT","NOV","DEC")),
+         hour_of_day = hour({{date}}))
+
+}
+
+solarprediction %>% generate_month(date_time) %>% 
+  assert(within_bounds(0,23), hour_of_day) %>% 
+  assert(in_set(c("SEPT","OCT","NOV","DEC"), month))
+```
+I also use assert for 'month' and 'hour_of_day' columns to make sure the features I generate are what I want.
+
+## Feature Engineering: sunshine_hours
+
+Then I guess the total hour of daylight maybe related to radiation. We could compute time_sun_rise and time_sun_set into sunshine_hours
+
+```{r nwe feature: sunshine_hours}
+sunshine_hours <- function(df,sunset,sunrise){
+df <- df %>% 
+  mutate(sunshine_hours = round((hour({{sunset}}) - hour({{sunrise}})+ (minute({{sunset}}) - minute({{sunrise}}))/60), 2))
+}
+
+solarprediction %>% 
+  sunshine_hours(time_sun_set,time_sun_rise) %>% 
+  assert(within_bounds(0,24),sunshine_hours)
+
+```
+I also use assert for 'sunshine_hours' column to make sure the features I generate are what I want.
+
+## Feature Engineering: day_with_sun
+
+I believe radiation is related whether it is a day with sun or a night without sun.
+
+```{r new feature: day_with_sun}
+day_with_sun <- function(df, sunset, sunrise, real_time){
+  df <- df %>% 
+    mutate(day_with_sun = if_else({{real_time}} >= {{sunrise}} & {{real_time}} <= {{sunset}}, "TRUE", "FALSE"))
+}
+
+solarprediction %>%
+  day_with_sun(time_sun_set, time_sun_rise, time)
+```
+
+## Feature Engineering: Compass Wind Directions
+
+Wind direction degrees is a numeric variable but doesn't make any sense in numeric type. However, compass wind directions may affect solar radiation somehow. So, I will transfer wind direction degress into compass directions.
+
+```{r new feature: compass_direction}
+compass_directions <- function(df){
+  if (!"wind_direction_degrees" %in% names(df)){
+    stop("data must contain 'wind_direction_degrees'")
+  }
+  df <- df %>% 
+    mutate(compass_direction = factor(round(wind_direction_degrees/22.5,0), labels = c("N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW","N")))
+}
+
+solarprediction %>% 
+  compass_directions() %>% 
+  assert(in_set(c("N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW","N")),compass_direction) %>% 
+  head()
+```
+I use assert for 'compass direction' column to make sure the features I generate are what I want.
+
 5. Prepare the data for modeling
 
 Note: this will form the basis for your midterm project. Take advantage of TA's and my office hours. We can provide feedback and guidance. 
 
+## Applying feature engineering functions to generate new data table
+```{r applying feature engineering functions}
+solar_feature_engineering <- solarprediction %>% 
+  generate_month(date_time) %>% 
+  sunshine_hours(time_sun_set,time_sun_rise) %>% 
+  day_with_sun(time_sun_set, time_sun_rise, time) %>% 
+  compass_directions()
+
+head(solar_feature_engineering)
+```
+
+
+## Library package
+
+```{r select response and predictor variables for modeling}
+solar_model <- solar_feature_engineering %>% 
+  select(everything(),-time, -date_time,-time_sun_rise, -time_sun_set,-wind_direction_degrees)
+
+head(solar_model)
+```
+
+```{r prepare train, validation and test set for modeling}
+set.seed(11)
+train_sub <- sample(nrow(solar_model),0.7*nrow(solar_model))
+train_set <- df_model[train_sub,]
+val_test_set <- df_model[-train_sub,]
+val_sub <- sample(nrow(val_test_set), 0.5*nrow(val_test_set))
+val_set <- val_test_set[val_sub,]
+test_set <- val_test_set[-val_sub,]
+```
+
+I have select features/predictors which I think are useful to build predictive models, and devide into train, validation and test set.
