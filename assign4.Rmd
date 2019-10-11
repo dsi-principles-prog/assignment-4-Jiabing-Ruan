@@ -307,8 +307,8 @@ head(solar_model)
 ```{r prepare train, validation and test set for modeling}
 set.seed(11)
 train_sub <- sample(nrow(solar_model),0.7*nrow(solar_model))
-train_set <- df_model[train_sub,]
-val_test_set <- df_model[-train_sub,]
+train_set <- solar_model[train_sub,]
+val_test_set <- solar_model[-train_sub,]
 val_sub <- sample(nrow(val_test_set), 0.5*nrow(val_test_set))
 val_set <- val_test_set[val_sub,]
 test_set <- val_test_set[-val_sub,]
