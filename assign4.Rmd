@@ -83,7 +83,7 @@ Use str_detect to find all words that:
 That only contain consonants. (Hint: thinking about matching “not”-vowels.)
 
 ```{r Only contain consonants}
-str_detect(words,"^([^aeiou]+)$")
+words[str_detect(words,"^([^aeiou]+)$")]
 
 find1 <- rx() %>% 
   rx_start_of_line() %>% 
@@ -92,22 +92,23 @@ find1 <- rx() %>%
 
 find1
 
-str_detect(words, find1)
+words[str_detect(words, find1)]
 ```
 
 Empirically verify the rule “i before e except after c”.
 
 ```{r Empirically verify the rule “i before e except after c”}
 
-str_detect(words, "[^c]ie")
+words[str_detect(words, "[^c]ie")]
 
 rule <- rx() %>% 
-  rx_anything_but("c") %>% 
+  rx_something_but("c") %>% 
   rx_find("i") %>% 
   rx_find("e") %>% 
   print()
 
-str_detect(words, rule)
+words[str_detect(words, rule)]
+
 ```
 
 
@@ -307,8 +308,8 @@ head(solar_model)
 ```{r prepare train, validation and test set for modeling}
 set.seed(11)
 train_sub <- sample(nrow(solar_model),0.7*nrow(solar_model))
-train_set <- df_model[train_sub,]
-val_test_set <- df_model[-train_sub,]
+train_set <- solar_model[train_sub,]
+val_test_set <- solar_model[-train_sub,]
 val_sub <- sample(nrow(val_test_set), 0.5*nrow(val_test_set))
 val_set <- val_test_set[val_sub,]
 test_set <- val_test_set[-val_sub,]
